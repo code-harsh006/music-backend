@@ -18,7 +18,7 @@ const userSchema = new mongoose.Schema({
     trim: true,
     match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
   },
-  passwordHash: {
+  password: {
     type: String,
     required: [true, 'Password is required'],
     minlength: [6, 'Password must be at least 6 characters long']
@@ -27,7 +27,7 @@ const userSchema = new mongoose.Schema({
   timestamps: true,
   toJSON: {
     transform: function(doc, ret) {
-      delete ret.passwordHash;
+      delete ret.password;
       delete ret.__v;
       return ret;
     }
@@ -40,11 +40,11 @@ userSchema.index({ username: 1 });
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('passwordHash')) return next();
+  if (!this.isModified('password')) return next();
   
   try {
     const salt = await bcrypt.genSalt(12);
-    this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
+    this.password = await bcrypt.hash(this.password, salt);
     next();
   } catch (error) {
     next(error);
@@ -53,7 +53,7 @@ userSchema.pre('save', async function(next) {
 
 // Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.passwordHash);
+  return bcrypt.compare(candidatePassword, this.password);
 };
 
 export default mongoose.model('User', userSchema);

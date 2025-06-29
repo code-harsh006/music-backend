@@ -18,8 +18,26 @@ import notFound from './middleware/notFound.js';
 // Load environment variables
 dotenv.config();
 
+// Validate required environment variables
+const requiredEnvVars = [
+  'MONGODB_URI',
+  'JWT_SECRET',
+  'AWS_REGION',
+  'AWS_ACCESS_KEY_ID',
+  'AWS_SECRET_ACCESS_KEY',
+  'S3_BUCKET_NAME'
+];
+
+const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+
+if (missingEnvVars.length > 0) {
+  console.error('❌ Missing required environment variables:', missingEnvVars.join(', '));
+  console.error('Please check your .env file');
+  process.exit(1);
+}
+
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5001;
 
 // Security middleware
 app.use(helmet());
@@ -44,8 +62,22 @@ app.use(limiter);
 app.use(morgan('combined'));
 
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ 
+  limit: '10mb',
+  verify: (req, res, buf) => {
+    try {
+      JSON.parse(buf);
+    } catch (e) {
+      res.status(400).json({ error: 'Invalid JSON' });
+      throw new Error('Invalid JSON');
+    }
+  }
+}));
+app.use(express.urlencoded({ 
+  extended: true, 
+  limit: '10mb',
+  parameterLimit: 1000
+}));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -68,7 +100,14 @@ app.use(notFound);
 app.use(errorHandler);
 
 // MongoDB connection
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+  bufferCommands: false,
+  bufferMaxEntries: 0
+})
   .then(() => {
     console.log('✅ Connected to MongoDB');
     
@@ -84,6 +123,15 @@ mongoose.connect(process.env.MONGODB_URI)
       server.close(() => {
         console.log('Process terminated');
         mongoose.connection.close();
+      });
+    });
+
+    process.on('SIGINT', () => {
+      console.log('SIGINT received. Shutting down gracefully...');
+      server.close(() => {
+        console.log('Process terminated');
+        mongoose.connection.close();
+        process.exit(0);
       });
     });
 

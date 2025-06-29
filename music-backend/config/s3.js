@@ -3,6 +3,12 @@ import multer from 'multer';
 import multerS3 from 'multer-s3';
 import path from 'path';
 
+// Validate S3 configuration
+if (!process.env.AWS_REGION || !process.env.AWS_ACCESS_KEY_ID || 
+    !process.env.AWS_SECRET_ACCESS_KEY || !process.env.S3_BUCKET_NAME) {
+  throw new Error('Missing required S3 configuration. Please check your environment variables.');
+}
+
 // Configure AWS S3 client
 const s3Client = new S3Client({
   region: process.env.AWS_REGION,
